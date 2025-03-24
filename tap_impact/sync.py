@@ -5,6 +5,7 @@ from singer import metrics, metadata, Transformer, utils
 from singer.utils import strptime_to_utc
 from tap_impact.transform import transform_json
 from tap_impact.streams import STREAMS
+from zoneinfo import ZoneInfo
 
 LOGGER = singer.get_logger()
 BASE_URL = 'https://api.impact.com'
@@ -165,7 +166,7 @@ def sync_endpoint(client,
         max_bookmark_value = last_integer
     else:
         last_datetime = get_bookmark(state, stream_name, start_date)
-        last_datetime_dt = datetime.fromisoformat(last_datetime.replace('Z', '+00:00'))
+        last_datetime_dt = datetime.fromisoformat(last_datetime.replace('Z', '+00:00')).replace(tzinfo=ZoneInfo('UTC'))
         # Set default_date for actions and action_updates streams to 3 years ago
         # because defined start_date/bookmark date is older than 3 years
         default_date = end_dttm - timedelta(days=3*365)
