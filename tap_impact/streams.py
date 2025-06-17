@@ -72,7 +72,7 @@ STREAMS = {
                 'bookmark_type': 'datetime'
             },
             'clicks': {
-                'path': 'Campaigns/{}/Clicks',
+                'path': 'Clicks',
                 'data_key': 'Clicks',
                 'key_properties': ['id'],
                 'replication_method': 'INCREMENTAL',
