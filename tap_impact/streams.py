@@ -75,9 +75,8 @@ STREAMS = {
                 'path': 'Clicks',
                 'data_key': 'Clicks',
                 'params': {
-                    'CampaignId': '<parent_id>',
-                    'ActionDateStart': '<last_datetime>',
-                    'ActionDateEnd': '<current_datetime>',
+                    'ProgramId': '<parent_id>',
+                    'Date': '<current_datetime>',
                 },
                 'key_properties': ['id'],
                 'replication_method': 'INCREMENTAL',
