@@ -158,7 +158,8 @@ def sync_endpoint(client,
     max_bookmark_value = None
 
     end_dttm = utils.now()
-    end_dt = end_dttm.date()
+    # Keep the time component, otherwise the run drops everything after midnight UTC
+    end_dt = end_dttm
     start_dt = end_dt
     date_ranges = [(start_dt, end_dt)]
 
@@ -180,7 +181,7 @@ def sync_endpoint(client,
         max_bookmark_value = last_datetime
 
         if isinstance(max_bookmark_value, str):
-            start_dt = datetime.fromisoformat(max_bookmark_value.replace('Z', '+00:00')).date()
+            start_dt = datetime.fromisoformat(max_bookmark_value.replace('Z', '+00:00'))
         date_ranges = split_date_range(start_dt, end_dt) if stream_name in ('actions', 'action_updates') else [(start_dt, end_dt)]
 
     endpoint_total = 0
