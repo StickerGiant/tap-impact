@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from tap_impact.client import ImpactForbiddenError
+from tap_impact.client import ImpactError, ImpactForbiddenError, Server5xxError
 from tap_impact.discover import (
     _apply_access_checks,
     _check_stream_access,
@@ -47,9 +47,26 @@ class TestCheckStreamAccess(unittest.TestCase):
         result = _check_stream_access(self.client, 'ads', 'Ads')
         self.assertFalse(result)
 
-    def test_non_forbidden_exception_propagates(self):
-        self.client.request.side_effect = Exception('Server Error')
-        with self.assertRaises(Exception):
+    def test_returns_false_on_unmapped_impact_error(self):
+        # Impact answers 401 for Catalogs with a body raise_for_error cannot map
+        # to a status-specific class, so it arrives as a plain ImpactError.
+        self.client.request.side_effect = ImpactError(
+            '401 Client Error: Unauthorized for url: '
+            'https://api.impact.com/Advertisers/ACCOUNT/Catalogs.json?PageSize=1'
+        )
+        result = _check_stream_access(self.client, 'catalogs', 'Catalogs')
+        self.assertFalse(result)
+
+    def test_transient_server_error_propagates(self):
+        # Server5xxError does not subclass ImpactError, so a temporarily failing
+        # endpoint must not be silently dropped from the catalog.
+        self.client.request.side_effect = Server5xxError('503 Service Unavailable')
+        with self.assertRaises(Server5xxError):
+            _check_stream_access(self.client, 'ads', 'Ads')
+
+    def test_non_impact_exception_propagates(self):
+        self.client.request.side_effect = ValueError('Server Error')
+        with self.assertRaises(ValueError):
             _check_stream_access(self.client, 'ads', 'Ads')
 
 

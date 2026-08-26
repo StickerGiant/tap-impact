@@ -1,6 +1,6 @@
 import singer
 from singer.catalog import Catalog, CatalogEntry, Schema
-from tap_impact.client import ImpactForbiddenError
+from tap_impact.client import ImpactError, ImpactForbiddenError
 from tap_impact.schema import get_schemas
 from tap_impact.streams import STREAMS, flatten_streams
 
@@ -17,11 +17,11 @@ def _get_child_to_parent_map():
 
 
 def _check_stream_access(client, stream_name, path):
-    """Return True if the stream is accessible, False if 403 Forbidden."""
+    """Return True if the stream is accessible, False if 401 or 403 Forbidden."""
     try:
         client.request('GET', path=path, params={'PageSize': 1}, endpoint=stream_name)
         return True
-    except ImpactForbiddenError as ex:
+    except ImpactError as ex:
         LOGGER.warning(
             "Excluding unauthorized stream '%s' from catalog. HTTP-Error-Message: '%s'",
             stream_name,
@@ -66,8 +66,7 @@ def _apply_access_checks(client, schemas, field_metadata):
 
     if not accessible_streams:
         raise ImpactForbiddenError(
-            "HTTP-error-code: 403, Error: The credentials do not have "
-            "'read' access to any supported streams."
+            "The credentials do not have 'read' access to any supported streams."
         )
     elif inaccessible_streams:
         LOGGER.warning(
