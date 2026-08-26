@@ -122,6 +122,20 @@ def process_records(catalog, #pylint: disable=too-many-branches
         return max_bookmark_value, counter.value
 
 
+def to_utc_datetime(value):
+    """
+    Parse an ISO-8601 string into a timezone-aware UTC datetime.
+    A bookmark carries an explicit zone ('...Z'), but a configured start_date is
+    often a bare date ('2025-01-01') that parses naive and cannot be compared
+    against utils.now(). Only a value with no offset is assumed to be UTC; a
+    value that states an offset keeps the instant it names.
+    """
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=ZoneInfo('UTC'))
+    return parsed.astimezone(ZoneInfo('UTC'))
+
+
 def split_date_range(start_date, end_date):
     delta = timedelta(days=DEFAULT_WINDOW_SIZE)
     current_start = start_date
@@ -168,7 +182,7 @@ def sync_endpoint(client,
         max_bookmark_value = last_integer
     else:
         last_datetime = get_bookmark(state, stream_name, start_date)
-        last_datetime_dt = datetime.fromisoformat(last_datetime.replace('Z', '+00:00')).replace(tzinfo=ZoneInfo('UTC'))
+        last_datetime_dt = to_utc_datetime(last_datetime)
         # Set default_date for actions and action_updates streams to 3 years ago
         # because defined start_date/bookmark date is older than 3 years
         default_date = end_dttm - timedelta(days=3*365)
@@ -181,7 +195,7 @@ def sync_endpoint(client,
         max_bookmark_value = last_datetime
 
         if isinstance(max_bookmark_value, str):
-            start_dt = datetime.fromisoformat(max_bookmark_value.replace('Z', '+00:00'))
+            start_dt = to_utc_datetime(max_bookmark_value)
         date_ranges = split_date_range(start_dt, end_dt) if stream_name in ('actions', 'action_updates') else [(start_dt, end_dt)]
 
     endpoint_total = 0

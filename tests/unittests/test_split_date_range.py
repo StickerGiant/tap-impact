@@ -2,7 +2,10 @@ import unittest
 from datetime import datetime, timedelta
 from parameterized import parameterized
 
-from tap_impact.sync import split_date_range
+from singer import utils
+from zoneinfo import ZoneInfo
+
+from tap_impact.sync import split_date_range, to_utc_datetime
 
 # Define DEFAULT_WINDOW_SIZE to be 45 days
 DEFAULT_WINDOW_SIZE = 45
@@ -69,3 +72,35 @@ class TestSplitDateRange(unittest.TestCase):
 
         # Compare the actual result with the expected result
         self.assertEqual(actual_ranges, expected_ranges)
+
+
+class TestToUtcDatetime(unittest.TestCase):
+    """
+    Regression cover for the naive/aware mismatch that broke actions syncs:
+    a configured start_date such as '2025-01-01' parses naive, and comparing it
+    against the aware utils.now() in split_date_range raised
+    "can't compare offset-naive and offset-aware datetimes".
+    """
+
+    def test_bare_date_is_assumed_utc(self):
+        result = to_utc_datetime('2025-01-01')
+        self.assertEqual(result, datetime(2025, 1, 1, tzinfo=ZoneInfo('UTC')))
+        self.assertIsNotNone(result.tzinfo)
+
+    def test_zulu_timestamp_is_utc(self):
+        result = to_utc_datetime('2026-08-26T16:14:44Z')
+        self.assertEqual(result, datetime(2026, 8, 26, 16, 14, 44, tzinfo=ZoneInfo('UTC')))
+
+    def test_explicit_offset_keeps_the_instant(self):
+        # A stated offset must be converted, not overwritten: 18:00+02:00 is 16:00 UTC.
+        result = to_utc_datetime('2026-08-26T18:00:00+02:00')
+        self.assertEqual(result, datetime(2026, 8, 26, 16, 0, 0, tzinfo=ZoneInfo('UTC')))
+
+    def test_result_is_comparable_with_singer_now(self):
+        # The actual failure mode: this comparison used to raise TypeError.
+        self.assertLess(to_utc_datetime('2025-01-01'), utils.now())
+
+    def test_split_date_range_accepts_a_bare_config_start_date(self):
+        ranges = split_date_range(to_utc_datetime('2025-01-01'), utils.now())
+        self.assertGreater(len(ranges), 1)
+        self.assertTrue(all(s < e for s, e in ranges))
